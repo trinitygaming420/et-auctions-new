@@ -1,2 +1,0 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-Deno.serve(()=>new Response(`<!doctype html><meta name="viewport" content="width=device-width"><style>body{font-family:sans-serif;background:#080a0f;color:white;text-align:center;padding:60px 20px}h1{color:#ff5b2a}</style><h1>E&T Auctions</h1><p>Setup completed. Return to the E&T Auctions app and tap Refresh.</p>`,{headers:{"Content-Type":"text/html"}}));
