@@ -56,4 +56,4 @@ with check (
 );
 
 -- Refresh Supabase so the app sees the new fields immediately
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema'; 
