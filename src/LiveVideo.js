@@ -34,7 +34,8 @@ function Publisher({host,onError}){
     (async()=>{
       try{
         await localParticipant.setMicrophoneEnabled(true);
-        await localParticipant.setCameraEnabled(true);
+        // Seller broadcasts should open with the rear-facing camera.
+        await localParticipant.setCameraEnabled(true,{facingMode:"environment"});
       }catch(e){if(active)onError(e?.message||"The camera could not be started.")}
     })();
     return()=>{active=false};
@@ -49,19 +50,29 @@ function Tracks({host}){
 function CameraController({register}){
   const {localParticipant}=useLocalParticipant();
   const switching=useRef(false);
+  // Keep this in sync with the rear-camera default used by Publisher.
+  const facing=useRef("environment");
   const switchCamera=async()=>{
-    if(switching.current)return;
+    if(switching.current)throw new Error("The camera is already switching.");
     const publication=localParticipant?.getTrackPublication(Track.Source.Camera);
-    const mediaTrack=publication?.track?.mediaStreamTrack;
-    if(!mediaTrack||typeof mediaTrack.applyConstraints!=="function")throw new Error("Camera is still starting. Try again in a moment.");
+    const cameraTrack=publication?.track;
+    if(!cameraTrack)throw new Error("Camera is still starting. Try again in a moment.");
     switching.current=true;
     try{
-      const settings=typeof mediaTrack.getSettings==="function"?mediaTrack.getSettings():{};
-      const nextFacing=settings?.facingMode==="environment"?"user":"environment";
-      const constraints={...settings,facingMode:nextFacing};
-      delete constraints.deviceId;
-      delete constraints.groupId;
-      await mediaTrack.applyConstraints(constraints);
+      const settings=cameraTrack.mediaStreamTrack?.getSettings?.()||{};
+      const current=settings.facingMode||facing.current;
+      const nextFacing=current==="environment"?"user":"environment";
+
+      // Restarting the LiveKit track replaces the published WebRTC track too.
+      // applyConstraints alone is ignored by a number of Android camera drivers.
+      if(typeof cameraTrack.restartTrack==="function"){
+        await cameraTrack.restartTrack({facingMode:nextFacing});
+      }else{
+        await localParticipant.setCameraEnabled(false);
+        await localParticipant.setCameraEnabled(true,{facingMode:nextFacing});
+      }
+      facing.current=nextFacing;
+      return nextFacing;
     }finally{
       switching.current=false;
     }
