@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform, Text, View } from "react-native";
 import { AudioSession, LiveKitRoom, VideoTrack, isTrackReference, useLocalParticipant, useTracks } from "@livekit/react-native";
 import { Track } from "livekit-client";
@@ -48,11 +48,23 @@ function Tracks({host}){
 }
 function CameraController({register}){
   const {localParticipant}=useLocalParticipant();
+  const switching=useRef(false);
   const switchCamera=async()=>{
+    if(switching.current)return;
     const publication=localParticipant?.getTrackPublication(Track.Source.Camera);
     const mediaTrack=publication?.track?.mediaStreamTrack;
-    if(!mediaTrack||typeof mediaTrack._switchCamera!=="function")throw new Error("Camera is still starting. Try again in a moment.");
-    await Promise.resolve(mediaTrack._switchCamera());
+    if(!mediaTrack||typeof mediaTrack.applyConstraints!=="function")throw new Error("Camera is still starting. Try again in a moment.");
+    switching.current=true;
+    try{
+      const settings=typeof mediaTrack.getSettings==="function"?mediaTrack.getSettings():{};
+      const nextFacing=settings?.facingMode==="environment"?"user":"environment";
+      const constraints={...settings,facingMode:nextFacing};
+      delete constraints.deviceId;
+      delete constraints.groupId;
+      await mediaTrack.applyConstraints(constraints);
+    }finally{
+      switching.current=false;
+    }
   };
   useEffect(()=>{
     if(typeof register!=="function")return;
